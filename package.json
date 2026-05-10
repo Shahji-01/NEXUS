@@ -2,6 +2,7 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
+  "author": "Shahji",
   "scripts": {
     "dev": "pnpm -r --parallel --filter \"@workspace/api\" --filter \"@workspace/web\" run dev",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
