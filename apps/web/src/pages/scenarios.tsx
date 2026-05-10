@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Shell } from "@/components/layout/shell";
+import { API_URL as BASE } from "@/lib/api";
 import { useTrafficStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FlaskConical, Play, Loader2 } from "lucide-react";

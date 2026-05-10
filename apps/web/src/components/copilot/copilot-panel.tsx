@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { API_URL } from "@/lib/api";
 import { useTrafficStore } from "@/lib/store";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Send, Bot, Loader2 } from "lucide-react";

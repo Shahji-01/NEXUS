@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { API_URL } from "@/lib/api";
 import { motion } from "framer-motion";
 import { useTrafficStore } from "@/lib/store";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";

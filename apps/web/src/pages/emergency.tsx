@@ -1,4 +1,5 @@
 import { Shell } from "@/components/layout/shell";
+import { API_URL as BASE } from "@/lib/api";
 import { useTrafficStore } from "@/lib/store";
 import { useGetEmergencyEvents, getGetEmergencyEventsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

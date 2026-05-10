@@ -4,6 +4,7 @@ import { Play, CheckCircle2, Circle, Loader2, Zap, X, ChevronRight } from "lucid
 import { Button } from "@/components/ui/button";
 import { useTrafficStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { API_URL } from "@/lib/api";
 
 type StepStatus = "pending" | "active" | "done";
 

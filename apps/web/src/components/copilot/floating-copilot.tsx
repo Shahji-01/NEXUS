@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { API_URL } from "@/lib/api";
 import { useTrafficStore } from "@/lib/store";
 import { Bot, Send, Loader2, X, Minimize2, Maximize2, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";

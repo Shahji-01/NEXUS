@@ -1,4 +1,5 @@
 import { Shell } from "@/components/layout/shell";
+import { API_URL as BASE } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { useState, useEffect, useRef } from "react";
