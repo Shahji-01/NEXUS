@@ -1,0 +1,568 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: AI Junction Optimization System API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: traffic
+    description: Traffic data
+  - name: signals
+    description: Signal control
+  - name: emergency
+    description: Emergency events
+  - name: predictions
+    description: Congestion predictions
+  - name: auth
+    description: Authentication
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /traffic/live:
+    get:
+      operationId: getLiveTraffic
+      tags: [traffic]
+      summary: Get live traffic state for all lanes
+      responses:
+        "200":
+          description: Live traffic state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveTrafficState"
+
+  /traffic/history:
+    get:
+      operationId: getTrafficHistory
+      tags: [traffic]
+      summary: Get historical traffic logs
+      parameters:
+        - name: lane_id
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Traffic history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficHistoryResponse"
+
+  /traffic/summary:
+    get:
+      operationId: getTrafficSummary
+      tags: [traffic]
+      summary: Get summary stats (total vehicles, avg density, peak hour, critical count)
+      responses:
+        "200":
+          description: Traffic summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficSummary"
+
+  /signals/state:
+    get:
+      operationId: getSignalState
+      tags: [signals]
+      summary: Get current signal state for all lanes
+      responses:
+        "200":
+          description: Signal state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignalState"
+
+  /signals/override:
+    post:
+      operationId: overrideSignal
+      tags: [signals]
+      summary: Override signal for a specific lane (requires auth)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignalOverrideInput"
+      responses:
+        "200":
+          description: Override applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignalOverrideResult"
+
+  /signals/log:
+    get:
+      operationId: getSignalLog
+      tags: [signals]
+      summary: Get signal timing log with trigger breakdown and summary stats
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: lane_id
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Signal timing log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignalLogResponse"
+
+  /signals/ai-mode:
+    post:
+      operationId: setAiMode
+      tags: [signals]
+      summary: Toggle AI auto-management mode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiModeInput"
+      responses:
+        "200":
+          description: Mode updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiModeResult"
+
+  /emergency/events:
+    get:
+      operationId: getEmergencyEvents
+      tags: [emergency]
+      summary: Get historical emergency events
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Emergency events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmergencyEventList"
+
+  /predictions:
+    get:
+      operationId: getPredictions
+      tags: [predictions]
+      summary: Get 5/10/15 minute congestion predictions for all lanes
+      responses:
+        "200":
+          description: Predictions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictionResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login and get JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: JWT token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResult"
+        "401":
+          description: Invalid credentials
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        uptime_seconds:
+          type: integer
+      required:
+        - status
+
+    LaneData:
+      type: object
+      properties:
+        lane_id:
+          type: integer
+        vehicle_count:
+          type: integer
+        density:
+          type: number
+        cars:
+          type: integer
+        bikes:
+          type: integer
+        trucks:
+          type: integer
+        buses:
+          type: integer
+        avg_speed:
+          type: number
+        congestion_level:
+          type: string
+        direction:
+          type: string
+      required:
+        - lane_id
+        - vehicle_count
+        - density
+        - congestion_level
+
+    LiveTrafficState:
+      type: object
+      properties:
+        timestamp:
+          type: string
+        demo_mode:
+          type: boolean
+        lanes:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/LaneData"
+      required:
+        - timestamp
+        - demo_mode
+        - lanes
+
+    TrafficLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        lane_id:
+          type: integer
+        timestamp:
+          type: string
+        vehicle_count:
+          type: integer
+        density:
+          type: number
+        cars:
+          type: integer
+        bikes:
+          type: integer
+        trucks:
+          type: integer
+        buses:
+          type: integer
+        avg_speed:
+          type: ["number", "null"]
+        congestion_level:
+          type: string
+      required:
+        - id
+        - lane_id
+        - timestamp
+        - vehicle_count
+        - density
+        - congestion_level
+
+    TrafficHistoryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrafficLog"
+        total:
+          type: integer
+      required:
+        - items
+        - total
+
+    TrafficSummary:
+      type: object
+      properties:
+        total_vehicles_today:
+          type: integer
+        avg_density:
+          type: number
+        peak_hour:
+          type: integer
+        critical_events_today:
+          type: integer
+        emergency_events_today:
+          type: integer
+        system_uptime_seconds:
+          type: integer
+      required:
+        - total_vehicles_today
+        - avg_density
+        - peak_hour
+        - critical_events_today
+        - emergency_events_today
+        - system_uptime_seconds
+
+    SignalState:
+      type: object
+      properties:
+        phases:
+          type: object
+          additionalProperties:
+            type: string
+        current_green:
+          type: ["integer", "null"]
+        emergency_active:
+          type: boolean
+        emergency_lane:
+          type: ["integer", "null"]
+        manual_override:
+          type: boolean
+        time_remaining:
+          type: integer
+        ai_mode:
+          type: boolean
+      required:
+        - phases
+        - current_green
+        - emergency_active
+        - emergency_lane
+        - manual_override
+        - time_remaining
+        - ai_mode
+
+    SignalOverrideInput:
+      type: object
+      properties:
+        lane_id:
+          type: integer
+        duration_seconds:
+          type: integer
+        emergency:
+          type: boolean
+        reason:
+          type: string
+      required:
+        - lane_id
+        - duration_seconds
+
+    SignalOverrideResult:
+      type: object
+      properties:
+        status:
+          type: string
+        lane_id:
+          type: integer
+        reason:
+          type: ["string", "null"]
+      required:
+        - status
+        - lane_id
+
+    AiModeInput:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required:
+        - enabled
+
+    AiModeResult:
+      type: object
+      properties:
+        ai_mode:
+          type: boolean
+      required:
+        - ai_mode
+
+    EmergencyEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        junction_id:
+          type: integer
+        lane_id:
+          type: integer
+        timestamp:
+          type: string
+        vehicle_type:
+          type: string
+        confidence:
+          type: number
+        duration_seconds:
+          type: ["integer", "null"]
+        resolved:
+          type: boolean
+        resolved_at:
+          type: ["string", "null"]
+      required:
+        - id
+        - lane_id
+        - timestamp
+        - vehicle_type
+        - confidence
+        - resolved
+
+    EmergencyEventList:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmergencyEvent"
+        total:
+          type: integer
+      required:
+        - events
+        - total
+
+    LanePrediction:
+      type: object
+      properties:
+        lane_id:
+          type: integer
+        current_density:
+          type: number
+        prediction_5min:
+          type: number
+        prediction_10min:
+          type: number
+        prediction_15min:
+          type: number
+        alert_level:
+          type: string
+      required:
+        - lane_id
+        - current_density
+        - prediction_5min
+        - prediction_10min
+        - prediction_15min
+        - alert_level
+
+    PredictionResponse:
+      type: object
+      properties:
+        predictions:
+          type: array
+          items:
+            $ref: "#/components/schemas/LanePrediction"
+        generated_at:
+          type: string
+      required:
+        - predictions
+        - generated_at
+
+    SignalLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        lane_id:
+          type: integer
+        timestamp:
+          type: string
+        phase:
+          type: string
+        green_time_sec:
+          type: integer
+        trigger:
+          type: string
+        density_at_time:
+          type: number
+      required:
+        - id
+        - lane_id
+        - timestamp
+        - phase
+        - green_time_sec
+        - trigger
+        - density_at_time
+
+    SignalLogSummary:
+      type: object
+      properties:
+        ai_count:
+          type: integer
+        manual_count:
+          type: integer
+        emergency_count:
+          type: integer
+        avg_green_sec:
+          type: integer
+      required:
+        - ai_count
+        - manual_count
+        - emergency_count
+        - avg_green_sec
+
+    SignalLogResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignalLogEntry"
+        total:
+          type: integer
+        summary:
+          $ref: "#/components/schemas/SignalLogSummary"
+      required:
+        - logs
+        - total
+        - summary
+
+    LoginInput:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    LoginResult:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+      required:
+        - access_token
+        - token_type

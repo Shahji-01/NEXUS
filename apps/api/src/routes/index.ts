@@ -1,0 +1,40 @@
+import { Router, type IRouter } from "express";
+import healthRouter from "./health";
+import trafficRouter from "./traffic";
+import signalsRouter from "./signals";
+import emergencyRouter from "./emergency";
+import predictionsRouter from "./predictions";
+import authRouter from "./auth";
+import analyticsRouter from "./analytics";
+import weatherRouter from "./weather";
+import corridorRouter from "./corridor";
+import copilotRouter from "./copilot";
+import emissionsRouter from "./emissions";
+import scenariosRouter from "./scenarios";
+import pedestrianRouter from "./pedestrian";
+import incidentsRouter from "./incidents";
+import transitRouter from "./transit";
+import networkRouter from "./network";
+import scheduleRouter from "./schedule";
+
+const router: IRouter = Router();
+
+router.use(healthRouter);
+router.use(trafficRouter);
+router.use(signalsRouter);
+router.use(emergencyRouter);
+router.use(predictionsRouter);
+router.use(authRouter);
+router.use(analyticsRouter);
+router.use(weatherRouter);
+router.use(corridorRouter);
+router.use(copilotRouter);
+router.use(emissionsRouter);
+router.use(scenariosRouter);
+router.use(pedestrianRouter);
+router.use(incidentsRouter);
+router.use(transitRouter);
+router.use(networkRouter);
+router.use(scheduleRouter);
+
+export default router;

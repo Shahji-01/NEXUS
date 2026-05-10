@@ -1,0 +1,187 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-border: var(--primary-border);
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-secondary-border: var(--secondary-border);
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted-border: var(--muted-border);
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-border: var(--accent-border);
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive-border: var(--destructive-border);
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-primary-border: var(--sidebar-primary-border);
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-accent-border: var(--sidebar-accent-border);
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Base Light Mode - Not really used since this is a dark theme app but need to define */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  --primary: 240 5.9% 10%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+  --accent: 240 4.8% 95.9%;
+  --accent-foreground: 240 5.9% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 240 10% 3.9%;
+  --radius: 0.5rem;
+  
+  /* Cyberpunk specific vars */
+  --neon-green: 142 71% 45%;
+  --neon-yellow: 48 96% 53%;
+  --neon-red: 348 83% 47%;
+  --neon-blue: 217 91% 60%;
+}
+
+.dark {
+  --background: 224 71% 4%;
+  --foreground: 210 20% 98%;
+  
+  --card: 222 47% 7%;
+  --card-foreground: 210 20% 98%;
+  --card-border: 216 34% 17%;
+  
+  --popover: 222 47% 7%;
+  --popover-foreground: 210 20% 98%;
+  --popover-border: 216 34% 17%;
+  
+  --primary: 217 91% 60%;
+  --primary-foreground: 222 47% 11%;
+  --primary-border: 217 91% 60%;
+  
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 20% 98%;
+  --secondary-border: 217 33% 25%;
+  
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --muted-border: 217 33% 25%;
+  
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 20% 98%;
+  --accent-border: 217 33% 25%;
+  
+  --destructive: 348 83% 47%;
+  --destructive-foreground: 210 20% 98%;
+  --destructive-border: 348 83% 47%;
+  
+  --border: 216 34% 17%;
+  --input: 216 34% 17%;
+  --ring: 217 91% 60%;
+  
+  --chart-1: 217 91% 60%;
+  --chart-2: 142 71% 45%;
+  --chart-3: 48 96% 53%;
+  --chart-4: 348 83% 47%;
+  --chart-5: 280 65% 60%;
+  
+  --sidebar: 224 71% 4%;
+  --sidebar-foreground: 210 20% 98%;
+  --sidebar-border: 216 34% 17%;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-accent: 217 33% 17%;
+  --sidebar-accent-foreground: 210 20% 98%;
+  --sidebar-ring: 217 91% 60%;
+
+  --app-font-sans: 'Space Grotesk', 'Inter', sans-serif;
+  --app-font-mono: 'Space Mono', 'Fira Code', monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+.glow-green {
+  box-shadow: 0 0 10px hsl(var(--neon-green)), 0 0 20px hsl(var(--neon-green));
+}
+.glow-yellow {
+  box-shadow: 0 0 10px hsl(var(--neon-yellow)), 0 0 20px hsl(var(--neon-yellow));
+}
+.glow-red {
+  box-shadow: 0 0 10px hsl(var(--neon-red)), 0 0 20px hsl(var(--neon-red));
+}
+
+/* Adding custom scrollbar for cyberpunk feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
