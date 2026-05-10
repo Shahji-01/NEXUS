@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
+import { API_URL } from "@/lib/api";
 import { Download, TrendingUp, TrendingDown, Activity, Gauge, RefreshCw } from "lucide-react";
 
 const LANE_NAMES = ["All Lanes", "North Bound", "South Bound", "East Bound", "West Bound"];
@@ -28,7 +29,7 @@ function useHourlyData(laneId: number | null, refreshKey: number) {
   useEffect(() => {
     setLoading(true);
     const params = laneId !== null ? `?lane_id=${laneId}` : "";
-    fetch(`/api/analytics/hourly${params}`)
+    fetch(`${API_URL}/analytics/hourly${params}`)
       .then(r => r.json())
       .then(d => { setData(d.data ?? []); setLoading(false); })
       .catch(() => setLoading(false));
@@ -42,7 +43,7 @@ function useCongestionDist(laneId: number | null, refreshKey: number) {
   useEffect(() => {
     setLoading(true);
     const params = laneId !== null ? `?lane_id=${laneId}` : "";
-    fetch(`/api/analytics/congestion-distribution${params}`)
+    fetch(`${API_URL}/analytics/congestion-distribution${params}`)
       .then(r => r.json())
       .then(d => { setData(d.distribution ?? []); setLoading(false); })
       .catch(() => setLoading(false));
