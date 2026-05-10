@@ -9,7 +9,7 @@ import {
 import { Bus, Users, Clock, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const BASE = "/api";
+import { API_URL as BASE } from "@/lib/api";
 
 interface LaneStat {
   lane_id: number;

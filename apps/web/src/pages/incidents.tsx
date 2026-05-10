@@ -7,7 +7,7 @@ import { AlertTriangle, ShieldCheck, Clock, Gauge, Zap, Activity } from "lucide-
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
-const BASE = "/api";
+import { API_URL as BASE } from "@/lib/api";
 
 interface Incident {
   id: string;

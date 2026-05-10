@@ -67,7 +67,7 @@ export default function Emergency() {
     setTriggering(true);
     setTriggerMsg(null);
     try {
-      const res = await fetch("/api/emergency/trigger", {
+      const res = await fetch(`${BASE}/emergency/trigger`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lane_id: triggerLane, vehicle_type: triggerType }),

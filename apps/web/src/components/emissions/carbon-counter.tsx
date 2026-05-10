@@ -44,7 +44,7 @@ export function CarbonCounter() {
 
   useEffect(() => {
     const load = () =>
-      fetch("/api/emissions/snapshot")
+      fetch(`${API_URL}/emissions/snapshot`)
         .then(r => r.ok ? r.json() as Promise<EmissionsSnapshot> : null)
         .then(d => { if (d) setData(d); })
         .catch(() => {});

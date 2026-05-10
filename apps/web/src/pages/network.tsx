@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { NetworkFlowMap, NetworkScore } from "@/components/network/network-flow-map";
 
-const BASE = "/api";
+import { API_URL as BASE } from "@/lib/api";
 
 interface JunctionNode {
   id: number;

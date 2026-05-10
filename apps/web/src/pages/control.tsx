@@ -14,7 +14,7 @@ import { Shield, BrainCircuit, Hand, Lock, Zap, Activity, Clock, Database, Perso
 import { Input } from "@/components/ui/input";
 
 const LANE_NAMES = ["North Bound", "South Bound", "East Bound", "West Bound"];
-const BASE = "/api";
+import { API_URL as BASE } from "@/lib/api";
 
 interface HealthStats { uptime_seconds: number; db_rows: number; active_spike: { lane_id: number; density: number; expires_in: number } | null }
 

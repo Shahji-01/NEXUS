@@ -8,7 +8,7 @@ import { Calendar, Clock, ChevronRight, PersonStanding, School, Star, ArrowRight
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
-const BASE = "/api";
+import { API_URL as BASE } from "@/lib/api";
 
 interface SignalPlan {
   id: string;

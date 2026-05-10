@@ -87,7 +87,7 @@ export default function GreenWave() {
     const now = Date.now();
     if (now - lastFetchRef.current < 2000) return;
     lastFetchRef.current = now;
-    fetch("/api/corridor/status")
+    fetch(`${BASE}/corridor/status`)
       .then(r => r.ok ? r.json() as Promise<CorridorLiveState> : null)
       .then(d => { if (d) setLiveData(d); })
       .catch(() => {});
@@ -96,7 +96,7 @@ export default function GreenWave() {
   // Sync speed changes to backend
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetch("/api/corridor/speed", {
+      fetch(`${BASE}/corridor/speed`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ speed_kmh: speed }),

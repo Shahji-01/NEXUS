@@ -9,7 +9,7 @@ import {
 } from "recharts";
 import { Leaf, Fuel, TreeDeciduous, Car, TrendingDown, Zap } from "lucide-react";
 
-const BASE = "/api";
+import { API_URL as BASE } from "@/lib/api";
 
 interface Snapshot {
   current_idle_pct: number;

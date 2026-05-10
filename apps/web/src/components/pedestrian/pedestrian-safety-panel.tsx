@@ -60,7 +60,7 @@ export function PedestrianSafetyPanel() {
           density: l.density,
           avg_speed: l.avg_speed,
         }));
-        const res = await fetch("/api/pedestrian/score", {
+        const res = await fetch(`${API_URL}/pedestrian/score`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ junction_id: 0, lanes, weather: weatherRef.current }),

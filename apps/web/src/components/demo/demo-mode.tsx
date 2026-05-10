@@ -24,7 +24,7 @@ const STEPS: DemoStep[] = [
     detail: "AI switching all lanes to optimized rush-hour cycle timing — green windows dynamically extended.",
     duration: 10000,
     action: async () => {
-      await fetch("/api/copilot/command", {
+      await fetch(`${API_URL}/copilot/command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: "Switch to rush hour mode", traffic_context: {} }),
@@ -52,7 +52,7 @@ const STEPS: DemoStep[] = [
     detail: "Ambulance detected on North Bound — immediate green corridor granted, all other lanes halted.",
     duration: 18000,
     action: async () => {
-      await fetch("/api/emergency/trigger", {
+      await fetch(`${API_URL}/emergency/trigger`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lane_id: 0, vehicle_type: "ambulance" }),
@@ -66,7 +66,7 @@ const STEPS: DemoStep[] = [
     detail: "Asking Claude to assess live junction state and recommend next actions.",
     duration: 14000,
     action: async () => {
-      await fetch("/api/copilot/command", {
+      await fetch(`${API_URL}/copilot/command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: "What's causing the North Bound backup and what should we do?", traffic_context: {} }),
@@ -80,7 +80,7 @@ const STEPS: DemoStep[] = [
     detail: "Emergency cleared — AI restoring optimal signal defaults, throughput recovering.",
     duration: 7000,
     action: async () => {
-      await fetch("/api/copilot/command", {
+      await fetch(`${API_URL}/copilot/command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: "Reset junction to defaults", traffic_context: {} }),

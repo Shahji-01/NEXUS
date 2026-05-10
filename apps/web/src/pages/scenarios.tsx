@@ -58,7 +58,7 @@ export default function Scenarios() {
     }));
 
     try {
-      const res = await fetch("/api/scenarios/run", {
+      const res = await fetch(`${BASE}/scenarios/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenario_type: scenarioType, params, current_lanes: currentLanes }),
