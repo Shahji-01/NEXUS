@@ -50,7 +50,7 @@ function App() {
           <Router />
           <FloatingCopilot />
         </WouterRouter>
-        <Toaster theme="dark" position="top-right" />
+        <Toaster theme="dark" position="top-right" closeButton />
       </TooltipProvider>
     </QueryClientProvider>
   );
