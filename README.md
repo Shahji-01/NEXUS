@@ -452,23 +452,6 @@ free 512 MB tier. Uncomment the `nexus-detector` service in `render.yaml`
 | Video mode choppy | CPU inference ~1–2 fps; use a GPU or smaller input. Overlays are already downscaled. |
 | DB tables missing | Run `pnpm --filter @workspace/db run push` (Docker/Render do this automatically). |
 
----
-
-## What's Committed vs Ignored
-
-**Committed:** all source, generated API client/schemas, `.env.example`,
-deployment configs (`docker-compose.yml`, `render.yaml`, `vercel.json`), and the
-feature specs under `.kiro/specs/` (design docs — no secrets).
-
-**Git-ignored:** `.env` (real secrets), `node_modules/`, `dist/`,
-`*.tsbuildinfo`, Python `__pycache__/`/`.venv/`, model weights (`*.pt`), and demo
-clips (`apps/detector/clips/*.mp4`).
-
-> `.kiro/specs/` contains only Markdown design docs and is safe to commit. If you
-> later add Kiro **settings** (e.g. `.kiro/settings/mcp.json`, which can hold API
-> keys), add `.kiro/settings/` to `.gitignore`.
-
----
 
 ## Security Notes
 
