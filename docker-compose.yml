@@ -41,7 +41,7 @@ services:
       target: builder
     command: ["pnpm", "--filter", "@workspace/db", "run", "push"]
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nexus}
+      DATABASE_URL: postgres://${POSTGRES_USER:-enter user User name }:${POSTGRES_PASSWORD:-enter you password}@db:5432/${POSTGRES_DB:-nexus}
     depends_on:
       db:
         condition: service_healthy
