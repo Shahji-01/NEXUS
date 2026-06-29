@@ -62,6 +62,17 @@ export interface PendingSignalLog {
   densityAtTime: number;
 }
 
+/**
+ * Detection-derived emergency-vehicle candidate used to drive signal preemption
+ * when lane data is supplied externally (e.g. CV detection / video mode).
+ * `type` is a free-form string ("ambulance" | "fire_truck" | "police" | "unknown").
+ */
+export interface EmergencyCandidate {
+  lane_id: number;
+  type: string;
+  confidence: number;
+}
+
 export interface TrafficUpdate {
   type: "traffic_update";
   timestamp: string;
@@ -72,6 +83,18 @@ export interface TrafficUpdate {
   pressure_scores: Record<number, number>;
   adaptive_cycle_budget_sec: number;
   pedestrian_walk_active: boolean;
+  /**
+   * Additive, optional active-source descriptor surfaced to dashboard clients
+   * (Requirements 6.5, 7.7). Populated by `DataSourceManager.getUpdate()` in
+   * both simulation and video modes; left unset by the engine's own
+   * `tick()` / `tickWithLanes()` / `peek()` so existing behavior — and any
+   * client that ignores this field — is unaffected.
+   */
+  data_source?: {
+    mode: "simulation" | "video";
+    detection: "initializing" | "ready" | "degraded" | "unavailable";
+    fallback_active: boolean;
+  };
 }
 
 // Signal timing constants
@@ -81,6 +104,9 @@ const YELLOW_TIME = 4_000;
 const ALL_RED_TIME = 2_000;
 const EMERGENCY_TIMEOUT = 120_000;
 const WALK_TIME = 12_000;
+
+// Valid emergency vehicle types, shared across random and detection-driven preemption.
+const EMERGENCY_VEHICLE_TYPES: VehicleType[] = ["ambulance", "fire_truck", "police"];
 
 // Adaptive cycle budget range (total rotation across all 4 lanes)
 const MIN_CYCLE_BUDGET = 60_000;   // quiet night — ~15s per lane
@@ -95,11 +121,33 @@ function getRushMultiplier(hour: number): number {
   return 0.30 + Math.random() * 0.35;                                  // off-peak
 }
 
-function congestionLevel(density: number): CongestionLevel {
+export function congestionLevel(density: number): CongestionLevel {
   if (density > 80) return "critical";
   if (density > 55) return "high";
   if (density > 30) return "medium";
   return "low";
+}
+
+/**
+ * Clamp a density value to the canonical `[0, 100]` range.
+ * Non-finite input (NaN, Infinity) is coerced to 0 — detection input may be malformed.
+ */
+export function clampDensity(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 100) return 100;
+  return n;
+}
+
+/**
+ * Clamp an average-speed value to the canonical `[0, 200]` km/h range.
+ * Non-finite input (NaN, Infinity) is coerced to 0 — detection input may be malformed.
+ */
+export function clampSpeed(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 200) return 200;
+  return n;
 }
 
 let _emgIdCounter = 1;
@@ -425,6 +473,119 @@ export class SimulationEngine {
     this._checkSpikeTrigger();
     this._updateLanes();
     this._checkEmergencyTrigger();
+    this._tickSignal();
+
+    const now = Date.now();
+    const timeRemaining = this._currentGreen !== null
+      ? Math.max(0, Math.round((this._greenEndTime - now) / 1000))
+      : 0;
+    const walkRemaining = this._phaseState === "walk"
+      ? Math.max(0, Math.round((this._phaseEndTime - now) / 1000))
+      : 0;
+
+    return {
+      type: "traffic_update",
+      timestamp: new Date().toISOString(),
+      lanes: { ...this._lanes },
+      signals: {
+        phases: { ...this._phases },
+        current_green: this._currentGreen,
+        emergency_active: this._emergencyLane !== null,
+        emergency_lane: this._emergencyLane,
+        manual_override: this._manualOverride,
+        time_remaining: timeRemaining,
+        ai_mode: this._aiMode,
+        pedestrian_walk_active: this._phaseState === "walk",
+        pedestrian_walk_remaining: walkRemaining,
+      },
+      emergency: this._activeEmergency,
+      weather: weatherService.get(),
+      pressure_scores: this.getPressureScores(),
+      adaptive_cycle_budget_sec: this.getAdaptiveCycleBudgetSec(),
+      pedestrian_walk_active: this._phaseState === "walk",
+    };
+  }
+
+  /**
+   * Activate signal preemption from a detection-derived emergency candidate.
+   * Mirrors the state transitions of the random `_checkEmergencyTrigger` path
+   * (so `_activeEmergency`, preemption phases, and the pending signal log behave
+   * identically) but uses the candidate's lane, type and confidence.
+   * `type` is free-form; non-`VehicleType` values (e.g. "unknown") fall back to
+   * "ambulance" so preemption still engages.
+   */
+  private _activateDetectionEmergency(candidate: EmergencyCandidate): void {
+    const now = Date.now();
+    const lane = candidate.lane_id;
+
+    this._emergencyLane = lane;
+    this._emergencyStart = now;
+    this._emergencyEndTime = now + EMERGENCY_TIMEOUT;
+    this._manualOverride = false;
+
+    LANE_IDS.forEach((lid) => { this._phases[lid] = "red"; });
+    this._phases[lane] = "green";
+    this._currentGreen = lane;
+    this._phaseState = "green";
+    this._phaseEndTime = this._emergencyEndTime;
+
+    const vtype: VehicleType = (EMERGENCY_VEHICLE_TYPES as string[]).includes(candidate.type)
+      ? (candidate.type as VehicleType)
+      : "ambulance";
+    const conf = Number.isFinite(candidate.confidence)
+      ? Math.min(1, Math.max(0, candidate.confidence))
+      : 0;
+
+    this._activeEmergency = {
+      id: _emgIdCounter++,
+      junction_id: 1,
+      lane_id: lane,
+      timestamp: new Date().toISOString(),
+      vehicle_type: vtype,
+      confidence: Math.round(conf * 100) / 100,
+      duration_seconds: null,
+      resolved: false,
+      resolved_at: null,
+    };
+
+    this._pendingSignalLogs.push({
+      laneId: lane,
+      phase: "green",
+      greenTimeSec: Math.round(EMERGENCY_TIMEOUT / 1000),
+      trigger: "emergency",
+      densityAtTime: Math.round((this._lanes[lane]?.density ?? 0) * 10) / 10,
+    });
+  }
+
+  /**
+   * Advance signal/emergency state using externally-supplied lane data
+   * (e.g. CV detection / video mode) instead of generated traffic.
+   *
+   * Unlike `tick()`, this skips `_updateLanes()`, the random congestion spike,
+   * and the random emergency generator. It injects `lanes` directly, drives
+   * emergency preemption from the detection-derived `emergencies`, then runs the
+   * shared `_tickSignal` / pressure-score / adaptive-green logic. The returned
+   * `TrafficUpdate` has the identical field set as `tick()`, and pending signal
+   * logs flow through the same `getAndClearPendingSignalLogs()` buffer.
+   *
+   * `tick()` behavior is unchanged.
+   */
+  tickWithLanes(lanes: Record<number, LaneData>, emergencies: EmergencyCandidate[]): TrafficUpdate {
+    // Inject detection-derived lanes in place of generated traffic.
+    this._lanes = lanes;
+
+    // Drive emergency preemption from detection candidates rather than the
+    // random generator. Only engage when no emergency is currently active;
+    // pick the highest-confidence candidate for a valid lane.
+    if (this._emergencyLane === null && emergencies.length > 0) {
+      const candidate = emergencies
+        .filter((e) => LANE_IDS.includes(e.lane_id as 0 | 1 | 2 | 3))
+        .sort((a, b) => b.confidence - a.confidence)[0];
+      if (candidate) {
+        this._activateDetectionEmergency(candidate);
+      }
+    }
+
     this._tickSignal();
 
     const now = Date.now();

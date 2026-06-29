@@ -1,4 +1,4 @@
-import { simulator } from "./simulation";
+import { dataSourceManager } from "./data-source-manager";
 import { updateDensityHistory } from "./prediction";
 import { incidentDetector } from "./incident-detector";
 import { emissionsCalculator } from "./emissions";
@@ -14,7 +14,7 @@ export function startBroadcaster() {
   if (broadcastInterval) return;
 
   broadcastInterval = setInterval(() => {
-    const update = simulator.tick();
+    const update = dataSourceManager.getUpdate();
 
     // Update prediction histories & feed incident detector
     Object.entries(update.lanes).forEach(([lid, lane]) => {
@@ -31,7 +31,7 @@ export function startBroadcaster() {
     broadcast(payload);
 
     // Write signal logs on every tick (only when new green phases started)
-    const pendingSignalLogs = simulator.getAndClearPendingSignalLogs();
+    const pendingSignalLogs = dataSourceManager.getAndClearPendingSignalLogs();
     if (pendingSignalLogs.length > 0) {
       db.insert(signalLogsTable).values(
         pendingSignalLogs.map((sl) => ({

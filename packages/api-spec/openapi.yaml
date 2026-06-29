@@ -20,6 +20,8 @@ tags:
     description: Congestion predictions
   - name: auth
     description: Authentication
+  - name: source
+    description: Data-source mode and detection status
 paths:
   /healthz:
     get:
@@ -209,6 +211,89 @@ paths:
                 $ref: "#/components/schemas/LoginResult"
         "401":
           description: Invalid credentials
+
+  /source/mode:
+    get:
+      operationId: getDataSourceMode
+      tags: [source]
+      summary: Get the current data-source mode and detection status
+      responses:
+        "200":
+          description: Current data-source mode and status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSourceModeResult"
+    post:
+      operationId: setDataSourceMode
+      tags: [source]
+      summary: Set the active data-source mode (simulation or video)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetDataSourceModeInput"
+      responses:
+        "200":
+          description: Updated data-source mode and status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSourceModeResult"
+
+  /detection/status:
+    get:
+      operationId: getDetectionStatus
+      tags: [source]
+      summary: Get the current data-source detection status
+      responses:
+        "200":
+          description: Data-source detection status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSourceStatus"
+
+  /detection/lanes/{laneId}/frame:
+    get:
+      operationId: getDetectionLaneFrame
+      tags: [source]
+      summary: Get the latest annotated overlay frame for a lane (proxied)
+      parameters:
+        - name: laneId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Annotated JPEG overlay frame
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+
+  /detection/lanes/{laneId}/stream:
+    get:
+      operationId: getDetectionLaneStream
+      tags: [source]
+      summary: Get the MJPEG overlay stream for a lane (proxied)
+      parameters:
+        - name: laneId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: MJPEG overlay stream
+          content:
+            multipart/x-mixed-replace:
+              schema:
+                type: string
+                format: binary
 
 components:
   schemas:
@@ -566,3 +651,58 @@ components:
       required:
         - access_token
         - token_type
+
+    DataSourceMode:
+      type: string
+      enum:
+        - simulation
+        - video
+
+    DetectionStatus:
+      type: string
+      enum:
+        - initializing
+        - ready
+        - degraded
+        - unavailable
+
+    DataSourceStatus:
+      type: object
+      properties:
+        mode:
+          $ref: "#/components/schemas/DataSourceMode"
+        detection:
+          $ref: "#/components/schemas/DetectionStatus"
+        fallback_active:
+          type: boolean
+        lane_errors:
+          type: object
+          additionalProperties:
+            type: ["string", "null"]
+        updated_at:
+          type: string
+      required:
+        - mode
+        - detection
+        - fallback_active
+        - lane_errors
+        - updated_at
+
+    SetDataSourceModeInput:
+      type: object
+      properties:
+        mode:
+          $ref: "#/components/schemas/DataSourceMode"
+      required:
+        - mode
+
+    DataSourceModeResult:
+      type: object
+      properties:
+        mode:
+          $ref: "#/components/schemas/DataSourceMode"
+        status:
+          $ref: "#/components/schemas/DataSourceStatus"
+      required:
+        - mode
+        - status

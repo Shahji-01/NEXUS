@@ -1,0 +1,99 @@
+# ============================================================================
+# NEXUS — AI Junction Optimizer: full production stack
+#
+#   docker compose up --build
+#
+# Services:
+#   db        — PostgreSQL 16 (persisted in a named volume)
+#   migrate   — one-shot Drizzle schema push (creates/syncs tables, then exits)
+#   detector  — Python CV microservice (YOLO/OpenCV), worker enabled
+#   app       — Express API + bundled React dashboard (serves the UI + /api + WS)
+#
+# Required: set SESSION_SECRET (see .env.example). Optional: GEMINI_API_KEY
+# enables the AI Copilot. Postgres credentials default to postgres/postgres/nexus.
+# ============================================================================
+
+x-postgres-env: &postgres-env
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  POSTGRES_DB: ${POSTGRES_DB:-nexus}
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      <<: *postgres-env
+    volumes:
+      - nexus-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-nexus}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # One-shot: push the Drizzle schema, then exit. Uses the builder stage which
+  # has pnpm + drizzle-kit + the schema source.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: builder
+    command: ["pnpm", "--filter", "@workspace/db", "run", "push"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nexus}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  detector:
+    build:
+      context: ./apps/detector
+    restart: unless-stopped
+    environment:
+      DETECTOR_WORKER: "1"
+    volumes:
+      # Swap in your own lane_{0..3}.mp4 clips here without rebuilding the image.
+      - ./apps/detector/clips:/app/clips:ro
+    expose:
+      - "8099"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8099/health').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  app:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nexus}
+      # REQUIRED — HMAC signing key for auth tokens. Set in .env or the shell.
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env (see .env.example)}
+      # The Node API reaches the detector over the compose network.
+      DETECTOR_URL: http://detector:8099
+      # Optional — enables the AI Copilot (Google Gemini).
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      detector:
+        condition: service_started
+
+volumes:
+  nexus-db:

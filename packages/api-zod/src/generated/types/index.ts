@@ -8,6 +8,11 @@
 
 export * from "./aiModeInput";
 export * from "./aiModeResult";
+export * from "./dataSourceMode";
+export * from "./dataSourceModeResult";
+export * from "./dataSourceStatus";
+export * from "./dataSourceStatusLaneErrors";
+export * from "./detectionStatus";
 export * from "./emergencyEvent";
 export * from "./emergencyEventList";
 export * from "./getEmergencyEventsParams";
@@ -21,6 +26,7 @@ export * from "./liveTrafficStateLanes";
 export * from "./loginInput";
 export * from "./loginResult";
 export * from "./predictionResponse";
+export * from "./setDataSourceModeInput";
 export * from "./signalLogEntry";
 export * from "./signalLogResponse";
 export * from "./signalLogSummary";

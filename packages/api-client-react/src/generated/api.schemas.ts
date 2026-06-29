@@ -162,6 +162,43 @@ export interface LoginResult {
   token_type: string;
 }
 
+export type DataSourceMode =
+  (typeof DataSourceMode)[keyof typeof DataSourceMode];
+
+export const DataSourceMode = {
+  simulation: "simulation",
+  video: "video",
+} as const;
+
+export type DetectionStatus =
+  (typeof DetectionStatus)[keyof typeof DetectionStatus];
+
+export const DetectionStatus = {
+  initializing: "initializing",
+  ready: "ready",
+  degraded: "degraded",
+  unavailable: "unavailable",
+} as const;
+
+export type DataSourceStatusLaneErrors = { [key: string]: string | null };
+
+export interface DataSourceStatus {
+  mode: DataSourceMode;
+  detection: DetectionStatus;
+  fallback_active: boolean;
+  lane_errors: DataSourceStatusLaneErrors;
+  updated_at: string;
+}
+
+export interface SetDataSourceModeInput {
+  mode: DataSourceMode;
+}
+
+export interface DataSourceModeResult {
+  mode: DataSourceMode;
+  status: DataSourceStatus;
+}
+
 export type GetTrafficHistoryParams = {
   /**
    * @nullable

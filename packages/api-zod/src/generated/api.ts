@@ -205,3 +205,60 @@ export const LoginResponse = zod.object({
   access_token: zod.string(),
   token_type: zod.string(),
 });
+
+/**
+ * @summary Get the current data-source mode and detection status
+ */
+export const GetDataSourceModeResponse = zod.object({
+  mode: zod.enum(["simulation", "video"]),
+  status: zod.object({
+    mode: zod.enum(["simulation", "video"]),
+    detection: zod.enum(["initializing", "ready", "degraded", "unavailable"]),
+    fallback_active: zod.boolean(),
+    lane_errors: zod.record(zod.string(), zod.string().nullable()),
+    updated_at: zod.string(),
+  }),
+});
+
+/**
+ * @summary Set the active data-source mode (simulation or video)
+ */
+export const SetDataSourceModeBody = zod.object({
+  mode: zod.enum(["simulation", "video"]),
+});
+
+export const SetDataSourceModeResponse = zod.object({
+  mode: zod.enum(["simulation", "video"]),
+  status: zod.object({
+    mode: zod.enum(["simulation", "video"]),
+    detection: zod.enum(["initializing", "ready", "degraded", "unavailable"]),
+    fallback_active: zod.boolean(),
+    lane_errors: zod.record(zod.string(), zod.string().nullable()),
+    updated_at: zod.string(),
+  }),
+});
+
+/**
+ * @summary Get the current data-source detection status
+ */
+export const GetDetectionStatusResponse = zod.object({
+  mode: zod.enum(["simulation", "video"]),
+  detection: zod.enum(["initializing", "ready", "degraded", "unavailable"]),
+  fallback_active: zod.boolean(),
+  lane_errors: zod.record(zod.string(), zod.string().nullable()),
+  updated_at: zod.string(),
+});
+
+/**
+ * @summary Get the latest annotated overlay frame for a lane (proxied)
+ */
+export const GetDetectionLaneFrameParams = zod.object({
+  laneId: zod.coerce.number(),
+});
+
+/**
+ * @summary Get the MJPEG overlay stream for a lane (proxied)
+ */
+export const GetDetectionLaneStreamParams = zod.object({
+  laneId: zod.coerce.number(),
+});

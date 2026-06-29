@@ -1,0 +1,23 @@
+# NEXUS video-traffic-detection — Python CV microservice (apps/detector)
+# Pinned to reasonable, currently-available versions. Heavy ML wheels are not
+# installed during scaffolding; install with `pip install -r requirements.txt`.
+
+# Web framework + ASGI server
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Settings / validation
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Computer vision + detection
+opencv-python-headless==4.10.0.84
+ultralytics==8.3.58          # YOLO detection + built-in tracker (ByteTrack/BoT-SORT)
+numpy==2.1.3
+
+# WebSocket support for the /stream push channel
+websockets==14.1
+
+# Testing
+pytest==8.3.4
+httpx==0.28.1                # FastAPI TestClient dependency / async HTTP for tests

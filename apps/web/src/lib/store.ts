@@ -26,6 +26,12 @@ export interface AlertItem {
   lane?: number;
 }
 
+export interface DataSourceInfo {
+  mode: 'simulation' | 'video';
+  detection: 'initializing' | 'ready' | 'degraded' | 'unavailable';
+  fallback_active: boolean;
+}
+
 interface TrafficStore {
   lanes: LiveTrafficStateLanes;
   signals: SignalState | null;
@@ -34,6 +40,7 @@ interface TrafficStore {
   pressureScores: Record<number, number>;
   adaptiveCycleBudgetSec: number;
   pedestrianWalkActive: boolean;
+  dataSource: DataSourceInfo | null;
   connected: boolean;
   lastUpdate: string | null;
   alerts: AlertItem[];
@@ -57,6 +64,7 @@ export const useTrafficStore = create<TrafficStore>((set) => ({
   pressureScores: {},
   adaptiveCycleBudgetSec: 60,
   pedestrianWalkActive: false,
+  dataSource: null,
   connected: false,
   lastUpdate: null,
   alerts: [],
@@ -71,6 +79,7 @@ export const useTrafficStore = create<TrafficStore>((set) => ({
     pressureScores: data.pressure_scores ?? state.pressureScores,
     adaptiveCycleBudgetSec: data.adaptive_cycle_budget_sec ?? state.adaptiveCycleBudgetSec,
     pedestrianWalkActive: data.pedestrian_walk_active ?? state.pedestrianWalkActive,
+    dataSource: data.data_source ?? state.dataSource,
     lastUpdate: data.timestamp || new Date().toISOString(),
   })),
   addAlert: (alert) => set((state) => {

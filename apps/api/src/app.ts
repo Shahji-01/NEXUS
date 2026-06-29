@@ -39,7 +39,11 @@ app.use("/api", router);
 const publicPath = path.resolve(process.cwd(), "dist/public");
 if (fs.existsSync(publicPath)) {
   app.use(express.static(publicPath));
-  app.get("*", (req, res, next) => {
+  // SPA fallback: serve index.html for client-side routes. Registered as a
+  // pattern-free middleware because Express 5 / path-to-regexp v8 rejects the
+  // bare "*" route pattern (it would throw at startup).
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (req.path.startsWith("/api")) return next();
     res.sendFile(path.join(publicPath, "index.html"));
   });

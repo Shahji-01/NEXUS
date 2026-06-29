@@ -1,635 +1,499 @@
-# NEXUS — AI Junction Optimizer: Complete Running Guide
+# NEXUS — AI Junction Optimizer
 
-A real-time smart traffic junction control dashboard. This guide covers every step needed to install, configure, and run the full project from scratch.
+A real-time smart traffic-junction control dashboard. NEXUS visualizes and
+optimizes a 4-lane intersection (North / South / East / West) using an adaptive
+signal controller, live KPIs, congestion prediction, emergency-vehicle
+preemption, weather awareness, and an AI copilot.
+
+Traffic data comes from one of two interchangeable sources, switchable at
+runtime:
+
+- **Simulation** (default) — a synthetic traffic engine with realistic
+  rush-hour patterns.
+- **Video (computer vision)** — a Python YOLO/OpenCV service that detects
+  vehicles from four lane video clips and feeds the same data pipeline.
 
 ---
 
 ## Table of Contents
 
-1. [Prerequisites](#1-prerequisites)
-2. [Project Structure](#2-project-structure)
-3. [Environment Variables](#3-environment-variables)
-4. [Install Dependencies](#4-install-dependencies)
-5. [Database Setup](#5-database-setup)
-6. [Running the Project](#6-running-the-project)
-7. [API Server In Depth](#7-api-server-in-depth)
-8. [Frontend Dashboard In Depth](#8-frontend-dashboard-in-depth)
-9. [Code Generation (OpenAPI → Hooks & Schemas)](#9-code-generation-openapi--hooks--schemas)
-10. [Full Build & Typecheck](#10-full-build--typecheck)
-11. [All Pages & Features](#11-all-pages--features)
-12. [API Endpoints Reference](#12-api-endpoints-reference)
-13. [Database Schema](#13-database-schema)
-14. [Simulation Engine](#14-simulation-engine)
-15. [Authentication](#15-authentication)
-16. [WebSocket Protocol](#16-websocket-protocol)
-17. [Common Gotchas](#17-common-gotchas)
-18. [Workspace Package Reference](#18-workspace-package-reference)
+1. [Features](#features)
+2. [Architecture](#architecture)
+3. [Tech Stack](#tech-stack)
+4. [Repository Layout](#repository-layout)
+5. [Prerequisites](#prerequisites)
+6. [Environment Variables](#environment-variables)
+7. [Local Development](#local-development)
+8. [Data Source Modes (Simulation vs Video)](#data-source-modes)
+9. [Testing](#testing)
+10. [API Reference](#api-reference)
+11. [Database Schema](#database-schema)
+12. [Deployment](#deployment)
+    - [Pre-push security checklist](#a--pre-push-security-checklist)
+    - [Push to GitHub](#b--push-to-github)
+    - [Cloud: Vercel + Render](#c--cloud-deploy--vercel--render-free)
+    - [Self-hosted: Docker Compose](#d--self-hosted--docker-compose-full-stack)
+13. [Troubleshooting](#troubleshooting)
+14. [What's Committed vs Ignored](#whats-committed-vs-ignored)
+15. [Security Notes](#security-notes)
+16. [Scripts Reference](#scripts-reference)
 
 ---
 
-## 1. Prerequisites
+## Features
 
-| Tool | Version | Notes |
-|------|---------|-------|
-| Node.js | 24+ | Required. Use `node -v` to check. |
-| pnpm | 9+ | Required. Run `npm i -g pnpm` if missing. |
-| PostgreSQL | 14+ | Any hosted or local Postgres instance works. |
-
-> Do **not** use `npm` or `yarn` — this project is pnpm-only. The `preinstall` script will reject any other package manager.
+- **Live dashboard** — 4 lane cards, animated 2×2 signal grid, KPI stats,
+  junction map, and a 5/10/15-minute congestion forecast.
+- **Adaptive signal control** — a pressure-score scheduler (density × wait-time ×
+  bus-priority) with an adaptive cycle budget, plus a `GREEN → YELLOW → ALL_RED`
+  state machine, pedestrian walk phases, and emergency preemption.
+- **Computer-vision detection** — a YOLO/OpenCV microservice detects vehicles
+  (car / bike / truck / bus), estimates per-lane speed via cross-frame tracking,
+  derives density/congestion, and recognizes emergency vehicles — all rendered as
+  annotated overlays on the dashboard.
+- **Runtime data-source toggle** — switch between simulation and video without a
+  restart; video mode gracefully falls back to simulation if the detector is
+  unavailable.
+- **Real-time feed** — WebSocket broadcast every 2 seconds, with REST polling
+  fallback.
+- **Congestion prediction, CO₂ emissions, incident detection, transit & green-wave
+  views, weather integration.**
+- **AI Copilot** — natural-language operator commands powered by **Google Gemini**.
+- **Historical analytics** — persisted to PostgreSQL (traffic, signal, and
+  emergency logs).
 
 ---
 
-## 2. Project Structure
+## Architecture
+
+```
+                         ┌──────────────────────────────────────────┐
+                         │  apps/web  (React + Vite dashboard)        │
+                         │  REST (React Query) + WebSocket client     │
+                         └───────────────┬────────────────────────────┘
+                                         │  /api/*  +  /api/ws
+                         ┌───────────────▼────────────────────────────┐
+                         │  apps/api  (Express 5 + ws)                 │
+                         │  ┌──────────────────────────────────────┐  │
+                         │  │ DataSourceManager (simulation|video)  │  │
+                         │  │   ├─ SimulationEngine                 │  │
+                         │  │   └─ VideoDataSource ◀── DetectionClient
+                         │  │ Broadcaster (2s tick) → WS + DB        │  │
+                         │  └──────────────────────────────────────┘  │
+                         └──────┬───────────────────────┬──────────────┘
+                                │ Drizzle ORM           │ HTTP / WS
+                     ┌──────────▼─────────┐   ┌──────────▼─────────────────┐
+                     │  PostgreSQL         │   │  apps/detector (Python)    │
+                     │  traffic/signal/    │   │  FastAPI + YOLO + OpenCV   │
+                     │  emergency logs     │   │  background worker + cache │
+                     └─────────────────────┘   └────────────────────────────┘
+```
+
+The API's `DataSourceManager` routes either the simulation or the video source
+into a single broadcaster, so the `LaneData` / `TrafficUpdate` contract — and
+everything downstream (dashboard, prediction, emissions, signal logic, DB) — is
+identical regardless of source.
+
+---
+
+## Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| Frontend | React 19, Vite 7, TypeScript, Tailwind, Radix/shadcn, TanStack Query, Zustand, Wouter |
+| Backend | Node 24, Express 5, `ws`, Pino, Drizzle ORM |
+| Database | PostgreSQL 16 |
+| Detector | Python 3.12, FastAPI, Ultralytics YOLO (`yolov8n`), OpenCV |
+| AI | Google Gemini (AI Copilot) |
+| Contract | OpenAPI → Orval codegen (React Query hooks + Zod schemas) |
+| Tooling | pnpm workspaces, esbuild (API bundle), Vitest + fast-check, pytest |
+
+---
+
+## Repository Layout
 
 ```
 /
 ├── apps/
-│   ├── api-server/          # Express 5 + WebSocket backend
-│   │   ├── src/
-│   │   │   ├── index.ts     # HTTP server + WS broadcaster
-│   │   │   ├── app.ts       # Express app, middleware, route mounts
-│   │   │   ├── packages/
-│   │   │   │   ├── simulation.ts     # Traffic + signal state machine (singleton)
-│   │   │   │   ├── prediction.ts     # 5/10/15-min congestion predictor
-│   │   │   │   ├── emissions.ts      # CO₂ emissions calculator
-│   │   │   │   ├── weather.ts        # Live weather poller
-│   │   │   │   ├── incident-detector.ts
-│   │   │   │   └── logger.ts
-│   │   │   └── routes/
-│   │   │       ├── traffic.ts        # /api/traffic/*
-│   │   │       ├── signals.ts        # /api/signals/*
-│   │   │       ├── emergency.ts      # /api/emergency/*
-│   │   │       ├── predictions.ts    # /api/predictions
-│   │   │       ├── auth.ts           # /api/auth/*
-│   │   │       ├── copilot.ts        # /api/copilot (AI chat)
-│   │   │       ├── analytics.ts      # /api/analytics/*
-│   │   │       ├── corridor.ts       # /api/corridor/*
-│   │   │       ├── emissions.ts      # /api/emissions/*
-│   │   │       ├── incidents.ts      # /api/incidents/*
-│   │   │       ├── network.ts        # /api/network/*
-│   │   │       ├── pedestrian.ts     # /api/pedestrian/*
-│   │   │       ├── schedule.ts       # /api/schedule/*
-│   │   │       ├── scenarios.ts      # /api/scenarios/*
-│   │   │       ├── transit.ts        # /api/transit/*
-│   │   │       ├── weather.ts        # /api/weather
-│   │   │       └── health.ts         # /api/healthz
-│   │   └── build.mjs                 # esbuild bundle script
-│   │
-│   └── junction-dashboard/  # React + Vite frontend
-│       └── src/
-│           ├── pages/
-│           │   ├── dashboard.tsx     # Live overview
-│           │   ├── analytics.tsx     # Historical charts
-│           │   ├── control.tsx       # Manual signal override (auth-gated)
-│           │   ├── emergency.tsx     # Emergency events
-│           │   ├── signal-log.tsx    # Signal timing log
-│           │   ├── green-wave.tsx    # Green wave corridor optimizer
-│           │   ├── copilot.tsx       # AI chat assistant
-│           │   ├── carbon.tsx        # Carbon/emissions tracking
-│           │   ├── incidents.tsx     # Incident detection log
-│           │   ├── transit.tsx       # Transit priority
-│           │   ├── network.tsx       # Network-wide optimization
-│           │   ├── schedule.tsx      # Scheduled signal plans
-│           │   └── scenarios.tsx     # What-if simulation
-│           ├── components/
-│           │   ├── layout/shell.tsx  # App shell + nav sidebar
-│           │   └── traffic/          # TrafficLight, LaneCard
-│           └── packages/
-│               └── store.ts          # Zustand store (WebSocket feed)
-│
+│   ├── api/         # Express API + WebSocket (esbuild-bundled)
+│   ├── web/         # React + Vite dashboard
+│   └── detector/    # Python CV microservice (YOLO/OpenCV, FastAPI)
 ├── packages/
-│   ├── api-spec/
-│   │   └── openapi.yaml              # OpenAPI contract (source of truth)
-│   ├── api-client-react/
-│   │   └── src/generated/            # Generated React Query hooks (do not edit)
-│   ├── api-zod/
-│   │   └── src/generated/            # Generated Zod schemas for backend (do not edit)
-│   └── db/
-│       └── src/schema/junction.ts    # Drizzle ORM schema
-│
-├── scripts/                          # Utility scripts
-├── pnpm-workspace.yaml               # Workspace config, catalog pins
-├── tsconfig.json                     # Root TS solution file (libs only)
-├── tsconfig.base.json                # Shared strict TS defaults
-└── package.json                      # Root task orchestration
+│   ├── api-spec/            # openapi.yaml (source of truth) + Orval config
+│   ├── api-client-react/    # generated React Query hooks (do not edit)
+│   ├── api-zod/             # generated Zod schemas (do not edit)
+│   ├── db/                  # Drizzle schema + pg client
+│   └── integrations-*/      # AI integration clients
+├── .kiro/specs/             # feature specs (requirements / design / tasks)
+├── docker-compose.yml       # full self-hosted stack (api + detector + db)
+├── render.yaml              # Render blueprint (API + Postgres)
+├── vercel.json              # Vercel config (dashboard)
+└── .env.example             # environment template
 ```
 
 ---
 
-## 3. Environment Variables
+## Prerequisites
 
-Two variables are **required** before the API server will start. Set them in your environment or a `.env`-equivalent before running.
+| Tool | Version | Notes |
+|------|---------|-------|
+| Node.js | 24+ | `node -v` |
+| pnpm | 10+ | `corepack enable` (the repo pins `pnpm@10.32.1`) |
+| PostgreSQL | 14+ | local install or a Docker container |
+| Python | 3.12+ | only needed to run the video detector |
+| Docker | optional | for the full self-hosted stack / a local Postgres |
 
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgres://user:pass@localhost:5432/nexus` |
-| `SESSION_SECRET` | Secret for HMAC-SHA256 auth token signing | Any long random string |
+> This is a **pnpm-only** monorepo. Do not use `npm` or `yarn`.
 
-> On Local, set these in the **Secrets** tab (the lock icon in the sidebar). They are automatically injected as environment variables at runtime.
+---
 
-To verify they are set before starting:
+## Environment Variables
+
+Copy the template and fill it in:
+
 ```bash
-echo $DATABASE_URL
-echo $SESSION_SECRET
+cp .env.example .env
 ```
+
+| Variable | Used by | Required | Description |
+|----------|---------|----------|-------------|
+| `PORT` | api | yes (local) | API port (e.g. `8080`). Render injects this in prod. |
+| `DATABASE_URL` | api, db | yes | PostgreSQL connection string |
+| `SESSION_SECRET` | api | yes | HMAC key for auth tokens (long random string) |
+| `DETECTOR_URL` | api | no | Detector base URL (default `http://127.0.0.1:8099`). Empty/unreachable → video mode falls back to simulation. |
+| `GEMINI_API_KEY` | api | no | Enables the AI Copilot (Google Gemini) |
+| `VITE_API_URL` | web (build) | prod only | API base URL baked into the dashboard build (cloud deploy). Local dev uses the Vite proxy. |
+| `DETECTOR_WORKER` | detector | yes (serving) | Set to `1` to run the background detection worker |
+
+`.env` is git-ignored. Never commit real secrets — `.env.example` (placeholders)
+is the only env file in git.
 
 ---
 
-## 4. Install Dependencies
+## Local Development
 
-From the project root, install all workspace packages at once:
+### 1. Install
 
 ```bash
 pnpm install
 ```
 
-This installs dependencies for every package in the monorepo (`apps/*`, `packages/*`, `scripts`). You only need to run this once (or after adding new packages).
+### 2. Start a database
 
----
+Any PostgreSQL works. With Docker:
 
-## 5. Database Setup
+```bash
+docker run -d --name nexus-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=nexus -p 5432:5432 postgres:16
+# then set in .env:  DATABASE_URL=postgres://postgres:postgres@localhost:5432/nexus
+```
 
-### Push the schema to Postgres
-
-This creates (or syncs) all three tables — `traffic_logs`, `emergency_events`, and `signal_logs` — using Drizzle Kit:
+### 3. Push the schema
 
 ```bash
 pnpm --filter @workspace/db run push
 ```
 
-You must re-run this command any time you change `packages/db/src/schema/junction.ts`.
+### 4. Run the app (API + dashboard)
 
-### Seeding
+```bash
+pnpm dev          # runs apps/api and apps/web together
+```
 
-No manual seed step is needed. When the API server starts and the `traffic_logs` table is empty, it automatically seeds **24 hours of synthetic historical data** across all 4 lanes (48 readings × 4 lanes = 192 rows), covering realistic rush-hour and off-peak density patterns.
+- API: `http://localhost:8080` (REST at `/api`, WebSocket at `/api/ws`)
+- Dashboard: the Vite dev server (default `http://localhost:5173`) proxies
+  `/api` → `http://localhost:8080`.
+
+On startup the API seeds 24h of synthetic history if the `traffic_logs` table is
+empty.
+
+> The API rebuilds (esbuild) each time `dev` runs; restart it after backend
+> source changes. The dashboard has hot reload.
+
+### 5. (Optional) Run the video detector
+
+```bash
+cd apps/detector
+pip install -r requirements.txt              # installs CPU PyTorch + YOLO + OpenCV
+# place four clips at: apps/detector/clips/lane_0.mp4 ... lane_3.mp4
+DETECTOR_WORKER=1 python -m uvicorn app.main:app --host 127.0.0.1 --port 8099
+```
+
+The YOLO weights (`yolov8n.pt`) download automatically on first run.
+
+Where to get demo clips: free traffic/intersection footage from
+[Pexels](https://www.pexels.com/videos/), [Pixabay](https://pixabay.com/videos/),
+or [Mixkit](https://mixkit.co/free-stock-video/traffic/). Name them
+`lane_0.mp4` … `lane_3.mp4`. An elevated/overhead angle of a single road approach
+detects best.
 
 ---
 
-## 6. Running the Project
+## Data Source Modes
 
-The project has two services that must both be running: the **API server** and the **frontend dashboard**.
-
-### Start the API Server
-
-```bash
-pnpm --filter @workspace/api run dev
-```
-
-What this does:
-1. Compiles TypeScript → bundles with esbuild into `apps/api/dist/index.mjs`
-2. Starts the Node.js server on the port defined by the `PORT` environment variable (default: `8080` in Local workflows)
-3. The API is proxied and accessible at `/api`
-
-> **Important:** The API server builds from source every time `dev` runs. After any code change to `apps/api/src/`, you must **restart this command** — hot-reload is not supported on the server side.
-
-### Start the Frontend Dashboard
+The dashboard's **Data Source** toggle (or the API) switches the live source at
+runtime. Default is `simulation`.
 
 ```bash
-pnpm --filter @workspace/web run dev
+# switch to video
+curl -X POST http://localhost:8080/api/source/mode \
+  -H "Content-Type: application/json" -d '{"mode":"video"}'
+
+# back to simulation
+curl -X POST http://localhost:8080/api/source/mode \
+  -H "Content-Type: application/json" -d '{"mode":"simulation"}'
 ```
 
-What this does:
-- Starts a Vite dev server on the port defined by `PORT` (default: `23304` in Local workflows)
-- The dashboard is proxied and accessible at `/` (root)
-- Vite HMR (hot module replacement) is active — frontend changes apply instantly without a restart
+In **video** mode the dashboard shows annotated overlays (bounding boxes + class
+labels) per lane and a detection-status badge. If the detector is unreachable or
+clips are missing, the API automatically falls back to simulation.
 
-### Access the App
+### How video detection works
 
-| Service | Local URL |
-|---------|-----------|
-| Dashboard (frontend) | `http://localhost:80/` |
-| API (backend) | `http://localhost:80/api/` |
-| Health check | `http://localhost:80/api/healthz` |
-| WebSocket | `ws://localhost:80/api/ws` |
+1. Four bundled clips (`apps/detector/clips/lane_{0..3}.mp4`) loop continuously.
+2. A single background worker reads frames, runs YOLO inference, tracks vehicles
+   across frames for speed, derives density/congestion, and recognizes emergency
+   vehicles — caching the latest result + annotated JPEG per lane. (Owning all
+   capture reads in one worker avoids OpenCV's thread-unsafe concurrent decode
+   and keeps the event loop responsive.)
+3. The Node API's `DetectionClient` consumes the detector (WebSocket push with
+   HTTP fallback), maps results into the canonical `LaneData`, and feeds the same
+   broadcaster the simulation uses.
+4. Overlay frames are proxied through the API at
+   `/api/detection/lanes/{laneId}/stream` (the browser never contacts the
+   detector directly).
 
-> When using `curl` or any shell command, always go through the shared proxy at `localhost:80`, never directly to port `8080` or `23304`.
-
-### Running Both Together (Local)
-
-In Local, both services are managed as **workflows** and start automatically. You can restart each independently:
-
-- **API Server workflow:** `apps/api: API Server`
-- **Dashboard workflow:** `apps/web: web`
+> **Performance:** inference is CPU-bound, so motion refreshes ~1–2× per second.
+> Overlay frames are downscaled + JPEG-compressed for smooth streaming. A GPU or
+> smaller input size speeds it up.
 
 ---
 
-## 7. API Server In Depth
+## Testing
 
-**Package:** `@workspace/api`  
-**Entry point:** `apps/api/src/index.ts`  
-**Build tool:** esbuild (bundles everything into a single CJS-compatible ESM file)
-
-### Build only (no start)
 ```bash
-pnpm --filter @workspace/api run build
+pnpm run typecheck                      # whole workspace
+pnpm --filter @workspace/api run test   # API unit/property tests (Vitest + fast-check)
+pnpm --filter @workspace/web run test   # web tests (Vitest + Testing Library)
+cd apps/detector && python -m pytest    # detector tests (pytest)
 ```
-Output goes to `apps/api/dist/index.mjs`.
-
-### Start only (from existing build)
-```bash
-pnpm --filter @workspace/api run start
-```
-
-### Typecheck only
-```bash
-pnpm --filter @workspace/api run typecheck
-```
-
-### What happens on startup
-
-1. `PORT` is read and validated — server refuses to start without it.
-2. `weatherService.start()` kicks off weather polling (immediate fetch + every 10 minutes).
-3. HTTP server and WebSocket server are created on the same port.
-4. The simulation broadcast loop starts: every 2 seconds, `simulator.tick()` advances the state machine and broadcasts to all connected WebSocket clients.
-5. Signal logs (new green phase grants) are written to `signal_logs` on every tick that produces them.
-6. Traffic logs are written to `traffic_logs` every 15 ticks (~30 seconds) to avoid write amplification.
-7. Emergency events are persisted to `emergency_events` when they resolve.
-8. `seedAnalyticsIfEmpty()` runs once — if `traffic_logs` is empty it inserts 24 hours of synthetic data.
-
-### Logging
-
-The server uses `pino` for structured JSON logging. In route handlers, use `req.log`. Outside routes, import the singleton `logger` from `./packages/logger`. **Never use `console.log` in server code.**
 
 ---
 
-## 8. Frontend Dashboard In Depth
+## API Reference
 
-**Package:** `@workspace/web`  
-**Entry point:** `apps/web/src/main.tsx`  
-**Build tool:** Vite 7
+All endpoints are prefixed with `/api`. Highlights (full contract in
+`packages/api-spec/openapi.yaml`):
 
-### Build for production
-```bash
-pnpm --filter @workspace/web run build
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/healthz` | Health check |
+| GET | `/traffic/live` | Current snapshot |
+| GET | `/traffic/history` | Historical logs (paginated) |
+| GET | `/traffic/summary` | Aggregate KPIs |
+| GET | `/signals/state` | Current signal phases |
+| POST | `/signals/override` | Manual lane override |
+| POST | `/signals/ai-mode` | Toggle AI scheduling |
+| GET | `/signals/log` | Signal timing log |
+| GET | `/predictions` | 5/10/15-min congestion forecast |
+| GET | `/emergency/events` | Emergency events |
+| POST | `/copilot/command` | AI Copilot command (Gemini) |
+| GET / POST | `/source/mode` | Get / set data source (`simulation` \| `video`) |
+| GET | `/detection/status` | Detection status (mode, detection, fallback) |
+| GET | `/detection/lanes/{laneId}/frame` | Proxied annotated JPEG |
+| GET | `/detection/lanes/{laneId}/stream` | Proxied MJPEG overlay stream |
+| WS | `/ws` | Real-time `TrafficUpdate` broadcast (every 2s) |
 
-### Typecheck only
-```bash
-pnpm --filter @workspace/web run typecheck
-```
+Regenerate the typed client/schemas after editing the spec:
 
-### Data flow
-
-```
-WebSocket /api/ws (2s tick)
-        │
-        ▼
-  useTrafficStore (Zustand)      ←── reconnect logic with backoff
-        │
-        ▼
-  Dashboard components           ←── subscribe to store slices
-        │
-        ├── LaneCard × 4
-        ├── Signal Grid (animated)
-        └── Prediction Area Chart
-
-REST /api/* (React Query)        ←── initial load + periodic refetch
-        │
-        ├── Analytics page       ─── history, summary, hourly, congestion
-        ├── Signal Log page      ─── /api/signals/log (10s auto-refresh)
-        ├── Emergency page       ─── /api/emergency/events
-        └── Control page         ─── /api/signals/state, /api/signals/override
-```
-
-### State management
-
-All live traffic data (lanes, signals, emergency state, last sync time) is stored in a **Zustand store** (`src/packages/store.ts` → `useTrafficStore`). The WebSocket hook populates this store on every 2-second tick. React components subscribe to individual slices.
-
-### Routing
-
-Client-side routing via **Wouter**. Routes are defined in `src/main.tsx` and map to page components in `src/pages/`.
-
----
-
-## 9. Code Generation (OpenAPI → Hooks & Schemas)
-
-The OpenAPI spec at `packages/api-spec/openapi.yaml` is the **single source of truth** for the API contract. From it, two sets of files are generated automatically:
-
-| Generated output | Location | Used by |
-|-----------------|----------|---------|
-| React Query hooks | `packages/api-client-react/src/generated/` | Frontend |
-| Zod validation schemas | `packages/api-zod/src/generated/` | API server routes |
-
-To regenerate after changing the spec:
 ```bash
 pnpm --filter @workspace/api-spec run codegen
 ```
 
-> Do **not** edit the files inside `generated/` directories by hand — they will be overwritten on the next codegen run.
+---
 
-Do not change `info.title` in `openapi.yaml` — the title controls the generated filenames and changing it will break all imports.
+## Database Schema
+
+Three tables (Drizzle ORM, `packages/db/src/schema/junction.ts`):
+
+- **`traffic_logs`** — per-lane readings (counts, density, vehicle classes, speed,
+  congestion).
+- **`signal_logs`** — green-phase grants (`ai` / `manual` / `emergency`).
+- **`emergency_events`** — detected emergency vehicles and resolutions.
+
+Re-run `pnpm --filter @workspace/db run push` after changing the schema.
 
 ---
 
-## 10. Full Build & Typecheck
+## Deployment
 
-### Typecheck everything (recommended before committing)
+Two supported paths:
+
+- **Cloud (free):** dashboard on **Vercel**, API + PostgreSQL on **Render**.
+  The detector is not deployed on free tier, so the cloud app runs in
+  **simulation mode** (video falls back gracefully).
+- **Self-hosted:** full stack (API + dashboard + detector + DB) via
+  **Docker Compose**.
+
+### A) Pre-push security checklist
+
+Already handled in this repo — verify before pushing:
+
+- ✅ `.env` (real secrets) is git-ignored — **never commit it**.
+- ✅ `.env.example` (placeholders only) **is** committed as the template.
+- ✅ Model weights (`*.pt`) and demo clips (`apps/detector/clips/*.mp4`) are
+  git-ignored.
+- ✅ `node_modules/`, `dist/`, `*.tsbuildinfo`, `__pycache__/` are git-ignored.
+- ✅ No API keys / tokens / private keys in tracked source.
+
+Quick re-check:
+
 ```bash
-pnpm run typecheck
+git status                 # .env must NOT appear
+git check-ignore .env      # should print ".env"
+git ls-files | grep -i env # should only show .env.example
 ```
-This runs `tsc --build` for composite libs first, then typechecks all artifact and script packages.
 
-### Typecheck libs only
+Secrets are provided at deploy time as **environment variables**, not files.
+
+### B) Push to GitHub
+
 ```bash
-pnpm run typecheck:libs
+git add .
+git commit -m "NEXUS: deploy-ready"
+git branch -M main
+git remote add origin https://github.com/<you>/<repo>.git   # first time only
+git push -u origin main
 ```
 
-### Full build (typecheck + bundle all packages)
+### C) Cloud deploy — Vercel + Render (free)
+
+```
+  Browser ─▶ Vercel (dashboard) ─HTTPS/WSS─▶ Render (API) ─▶ Render Postgres
+             env: VITE_API_URL ──────────────▶ https://<api>.onrender.com
+```
+
+**Step 1 — Backend on Render (do first; the frontend needs its URL):**
+
+1. <https://dashboard.render.com> → **New → Blueprint**, connect your repo.
+2. Render reads `render.yaml` and provisions:
+   - `nexus-db` — free PostgreSQL (database `nexus`)
+   - `nexus-api` — the Node web service
+3. Click **Apply**. Render automatically: injects `DATABASE_URL`, generates
+   `SESSION_SECRET`, runs the build (`pnpm install → build API → push schema`),
+   starts the API (reads Render's `PORT`), and health-checks `/api/healthz`.
+4. (Optional) set `GEMINI_API_KEY` on `nexus-api` to enable the AI Copilot.
+5. Copy the URL, e.g. `https://nexus-api.onrender.com`. Verify:
+   `https://<api>.onrender.com/api/healthz` → `{"status":"ok"}`.
+
+**Step 2 — Frontend on Vercel:**
+
+1. <https://vercel.com/new> → import the **same** repo. Vercel reads
+   `vercel.json` (build command, output `apps/web/dist/public`, SPA rewrites).
+   Keep the **Root Directory** as the repo root.
+2. Add an Environment Variable (Production + Preview):
+
+   | Name | Value |
+   |------|-------|
+   | `VITE_API_URL` | `https://nexus-api.onrender.com` (no trailing slash, no `/api`) |
+
+3. **Deploy.** Open the Vercel URL — the dashboard connects to the Render API.
+
+> `VITE_API_URL` is compiled in at build time. If you change it, **redeploy** Vercel.
+
+**Free-tier notes:** Render web services sleep after ~15 min idle (≈30–60 s cold
+start on next request; the dashboard auto-reconnects and polls meanwhile). The
+free Postgres expires after 90 days.
+
+### D) Self-hosted — Docker Compose (full stack)
+
+Runs API + dashboard + detector + PostgreSQL together. Services:
+
+| Service | Role | Port |
+|---------|------|------|
+| `app` | Express API + bundled dashboard + WebSocket | 8080 |
+| `detector` | Python CV microservice (worker enabled) | 8099 (internal) |
+| `db` | PostgreSQL 16 (persisted volume) | 5432 (internal) |
+| `migrate` | one-shot Drizzle schema push, then exits | — |
+
 ```bash
-pnpm run build
+cp .env.example .env          # set a strong SESSION_SECRET
+docker compose up --build -d  # → http://localhost:8080
 ```
 
-> **Note:** `pnpm run build` at the root needs `PORT` and `BASE_PATH` environment variables (supplied by Local workflows). It may fail when run directly from a shell without them. For verification, prefer `typecheck` over `build`.
+Startup order is automatic: `db` (health-checked) → `migrate` → `detector` →
+`app`. Provide the four `lane_{0..3}.mp4` clips in `apps/detector/clips/` (mounted
+into the detector). Operate with:
 
----
-
-## 11. All Pages & Features
-
-| Page | Route | Auth Required | Description |
-|------|-------|---------------|-------------|
-| Dashboard | `/` | No | Live overview: 4 lane cards, animated 2×2 signal grid, 5/10/15-min prediction chart, KPI stats, camera placeholder |
-| Analytics | `/analytics` | No | Historical charts: multi-lane density timeline, rush-hour profile, vehicle volume bar chart, congestion distribution. Lane filter + manual Refresh + CSV export |
-| Control | `/control` | Yes (admin) | Manual signal override form (lane, duration, emergency priority). AI mode toggle. Live signal grid mirrored |
-| Emergency | `/emergency` | No | Active emergency banner with pulse animation. Event log table with vehicle type icons, confidence %, duration, resolved/active badges |
-| Signal Log | `/signal-log` | No | Every green phase grant: AI-triggered, manual override, or emergency preemption. KPI cards + table with density bar. Manual Refresh button |
-| Green Wave | `/green-wave` | No | Corridor optimizer visualizing synchronized green waves across lanes. Status fetched every 2 seconds |
-| AI Copilot | `/copilot` | No | Chat interface powered by Anthropic. Context-aware of live traffic state |
-| What-If Sim | `/scenarios` | No | Simulate alternate traffic scenarios |
-| Carbon | `/carbon` | No | CO₂ and emissions tracking per lane |
-| Incidents | `/incidents` | No | Automated incident detection log |
-| Transit Priority | `/transit` | No | Transit vehicle priority management |
-| Network Opt. | `/network` | No | Network-wide signal optimization |
-| Schedule | `/schedule` | No | Scheduled signal timing plans |
-
----
-
-## 12. API Endpoints Reference
-
-All endpoints are prefixed with `/api`.
-
-### Health
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/healthz` | Health check |
-
-### Traffic
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/traffic/live` | Current live snapshot (uses `simulator.peek()`, no tick side-effect) |
-| GET | `/traffic/history` | Paginated historical logs with accurate `total` COUNT |
-| GET | `/traffic/summary` | Aggregate stats: avg density, peak hour, avg speed |
-
-### Signals
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/signals/state` | Current signal phase for all lanes |
-| POST | `/signals/override` | Manual override (auth required) |
-| GET | `/signals/log` | Signal timing history (paginated) |
-
-### Emergency
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/emergency/events` | All emergency events |
-| POST | `/emergency/trigger` | Manually trigger an emergency |
-
-### Predictions
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/predictions` | 5, 10, 15-minute congestion predictions per lane |
-
-### Authentication
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/auth/login` | Login with username + password, returns token |
-| POST | `/auth/logout` | Invalidate session |
-| GET | `/auth/me` | Current user info |
-
-### AI
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/copilot` | AI chat message (Anthropic, context-aware) |
-
-### Analytics
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/analytics/hourly` | Avg density/vehicles/speed grouped by hour |
-| GET | `/analytics/congestion-distribution` | Congestion level distribution |
-
-### Other
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/weather` | Live weather data |
-| GET | `/emissions/snapshot` | Current CO₂ emissions per lane |
-| GET | `/corridor/status` | Green wave corridor status |
-| GET | `/incidents` | Detected incidents |
-| POST | `/pedestrian/score` | Pedestrian crossing priority score |
-| GET | `/network/optimization` | Network-wide optimization state |
-| GET | `/schedule` | Scheduled timing plans |
-| GET | `/scenarios` | What-if scenario definitions |
-| GET | `/transit/priority` | Transit priority queue |
-
-### WebSocket
-| Path | Description |
-|------|-------------|
-| `/api/ws` | Real-time broadcast every 2 seconds. Payload: `{ lanes, signals, emergency, timestamp }` |
-
----
-
-## 13. Database Schema
-
-Three tables in PostgreSQL, managed via Drizzle ORM. Schema lives in `packages/db/src/schema/junction.ts`.
-
-### `traffic_logs`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | serial PK | |
-| `lane_id` | integer | 0=North, 1=South, 2=East, 3=West |
-| `timestamp` | timestamptz | Default: now() |
-| `vehicle_count` | integer | |
-| `density` | real | Percentage 0–100 |
-| `cars` | integer | |
-| `bikes` | integer | |
-| `trucks` | integer | |
-| `buses` | integer | |
-| `avg_speed` | real | km/h |
-| `congestion_level` | text | `low` / `medium` / `high` / `critical` |
-
-Index: `ix_traffic_logs_lane_time` on `(lane_id, timestamp)`.
-
-### `emergency_events`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | serial PK | |
-| `junction_id` | integer | Default: 1 |
-| `lane_id` | integer | |
-| `timestamp` | timestamptz | |
-| `vehicle_type` | text | `ambulance` / `fire_truck` / `police` |
-| `confidence` | real | 0.0–1.0 |
-| `duration_seconds` | integer | Nullable |
-| `resolved` | boolean | Default: false |
-| `resolved_at` | timestamptz | Nullable |
-
-Index: `ix_emergency_events_ts` on `timestamp`.
-
-### `signal_logs`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | serial PK | |
-| `lane_id` | integer | |
-| `timestamp` | timestamptz | Default: now() |
-| `phase` | text | e.g. `green` |
-| `green_time_sec` | integer | Duration of this green grant |
-| `trigger` | text | `ai` / `manual` / `emergency` |
-| `density_at_time` | real | Density when green was granted |
-
-Index: `ix_signal_logs_ts` on `timestamp`.
-
-> **Column naming:** Drizzle schema uses camelCase (`laneId`, `vehicleCount`) but all API responses map these to snake_case (`lane_id`, `vehicle_count`).
-
----
-
-## 14. Simulation Engine
-
-**File:** `apps/api/src/packages/simulation.ts`  
-**Singleton:** imported as `simulator` everywhere in the server.
-
-### Signal state machine
-
-```
-GREEN (AI-calculated duration)
-  → YELLOW (4 seconds, fixed)
-    → ALL_RED (2 seconds, fixed)
-      → next GREEN (next lane by density priority)
+```bash
+docker compose logs -f app        # tail logs
+docker compose ps                 # status
+docker compose down               # stop (keeps the db volume)
+docker compose down -v            # stop and delete the db volume
 ```
 
-- Only one lane is green at a time.
-- AI mode calculates green duration based on current density and vehicle count (longer green for higher density).
-- Emergency preemption grants an unconditional green to the detected lane for up to 2 minutes, bypassing the normal cycle.
-
-### Key methods
-
-| Method | Side effect | Description |
-|--------|-------------|-------------|
-| `simulator.tick()` | Advances state | Full simulation step — use only in the broadcast loop and on WS connect |
-| `simulator.peek()` | None | Returns current state snapshot — use for REST reads |
-| `simulator.getLanes()` | None | Returns current lane data without ticking |
-| `simulator.getSignalState()` | None | Returns current signal phases without ticking |
-| `simulator.getAndClearPendingSignalLogs()` | Clears buffer | Returns new green phase events since last call |
-
-### Weather integration
-
-The simulation is weather-aware. High wind, rain, or fog reduces average vehicle speeds and slightly increases density. Weather is fetched every 10 minutes by `weatherService` and injected into each tick.
-
-### DB write cadence
-
-| Event | When written |
-|-------|-------------|
-| Traffic logs | Every 15th tick (~30 seconds) |
-| Signal logs | Every tick that produces a new green grant |
-| Emergency events | When an emergency resolves (on the 15th-tick DB write) |
+**Enabling video on Render (optional, paid):** the detector needs more than the
+free 512 MB tier. Uncomment the `nexus-detector` service in `render.yaml`
+(Docker runtime, paid plan, CPU PyTorch), provide clips, set `DETECTOR_URL` on
+`nexus-api`, and redeploy.
 
 ---
 
-## 15. Authentication
+## Troubleshooting
 
-Auth is a lightweight **HMAC-SHA256** signed token scheme — no user table in the database.
-
-- **Credentials:** `admin` / `admin123` (hardcoded for demo)
-- **Login:** `POST /api/auth/login` → returns a signed token
-- **Protected routes:** Send the token as `Authorization: Bearer <token>` header
-- In the frontend, the Control page checks auth state and redirects to a login form if not authenticated
-
-The `SESSION_SECRET` environment variable is the HMAC key. Changing it invalidates all existing tokens.
-
----
-
-## 16. WebSocket Protocol
-
-### Connecting
-
-```
-ws://localhost:80/api/ws
-```
-
-### Message format (server → client, every 2 seconds)
-
-```json
-{
-  "lanes": {
-    "0": {
-      "lane_id": 0,
-      "vehicle_count": 12,
-      "density": 34.5,
-      "cars": 8,
-      "bikes": 1,
-      "trucks": 2,
-      "buses": 1,
-      "avg_speed": 42.3,
-      "congestion_level": "medium",
-      "direction": "north"
-    },
-    "1": { ... },
-    "2": { ... },
-    "3": { ... }
-  },
-  "signals": {
-    "phases": { "0": "red", "1": "green", "2": "red", "3": "red" },
-    "current_green": 1,
-    "emergency_active": false,
-    "emergency_lane": null,
-    "manual_override": false,
-    "time_remaining": 18,
-    "ai_mode": true,
-    "pedestrian_walk_active": false,
-    "pedestrian_walk_remaining": 0
-  },
-  "emergency": null,
-  "timestamp": "2026-05-10T07:28:00.000Z"
-}
-```
-
-### Reconnect logic
-
-The frontend WebSocket hook implements exponential backoff reconnection. Both `onerror` and `onclose` handlers clear any pending reconnect timer before scheduling a new one — preventing timer stacking during rapid disconnect/reconnect cycles.
-
-### Fallback polling
-
-If the WebSocket is disconnected, the dashboard falls back to polling `GET /api/traffic/live` every 2 seconds. This endpoint uses `simulator.peek()` (no tick side-effect) so it never double-advances the simulation.
+| Symptom | Cause / Fix |
+|---------|-------------|
+| First cloud load is slow (~30–60 s) | Render free tier sleeps after ~15 min idle; it cold-starts on the next request. Normal. |
+| Dashboard shows no data (cloud) | Ensure `VITE_API_URL` is set on Vercel and you **redeployed** after setting it. |
+| WebSocket won't connect | It derives `wss://` from `VITE_API_URL` (cloud) or the proxy (local). The app polls as a fallback. |
+| Render build fails on `pnpm` | The repo pins `packageManager: pnpm@10.32.1`; the build runs `corepack enable` first. |
+| `TS6305 … dist not built` in Docker | Stale `*.tsbuildinfo` — it's git/docker-ignored so a clean build rebuilds composites. |
+| Express crash `PathError: Missing parameter name` | Express 5 wildcard — the SPA fallback uses a pattern-free middleware (already fixed). |
+| Detector OOM / huge image | Use the included CPU-only PyTorch (the Dockerfile installs the CPU wheel, not CUDA). |
+| Video mode choppy | CPU inference ~1–2 fps; use a GPU or smaller input. Overlays are already downscaled. |
+| DB tables missing | Run `pnpm --filter @workspace/db run push` (Docker/Render do this automatically). |
 
 ---
 
-## 17. Common Gotchas
+## What's Committed vs Ignored
 
-| Situation | What to do |
-|-----------|-----------|
-| API server code changed | Restart the API server — it must rebuild the esbuild bundle |
-| Drizzle schema changed | Run `pnpm --filter @workspace/db run push` |
-| OpenAPI spec changed | Run `pnpm --filter @workspace/api-spec run codegen` |
-| `PORT` not set | The API server will throw immediately on startup — set the env var |
-| `DATABASE_URL` not set | Server starts but all DB queries fail — set the env var |
-| Editor and CLI disagree on types | Trust `pnpm run typecheck` — it is authoritative |
-| `pnpm run dev` at root | There is no root `dev` script — use the per-package commands above |
-| Calling `curl` to a service port directly | Always go through `localhost:80` (the shared proxy) |
-| Generated files look wrong | Do not edit `src/generated/` — re-run codegen instead |
+**Committed:** all source, generated API client/schemas, `.env.example`,
+deployment configs (`docker-compose.yml`, `render.yaml`, `vercel.json`), and the
+feature specs under `.kiro/specs/` (design docs — no secrets).
 
----
+**Git-ignored:** `.env` (real secrets), `node_modules/`, `dist/`,
+`*.tsbuildinfo`, Python `__pycache__/`/`.venv/`, model weights (`*.pt`), and demo
+clips (`apps/detector/clips/*.mp4`).
 
-## 18. Workspace Package Reference
-
-| Package | Name | Description |
-|---------|------|-------------|
-| `apps/api` | `@workspace/api` | Express 5 backend + WebSocket broadcaster |
-| `apps/web` | `@workspace/web` | React + Vite frontend dashboard |
-| `packages/api-spec` | `@workspace/api-spec` | OpenAPI spec + Orval codegen config |
-| `packages/api-client-react` | `@workspace/api-client-react` | Generated React Query hooks (do not edit) |
-| `packages/api-zod` | `@workspace/api-zod` | Generated Zod schemas for backend (do not edit) |
-| `packages/db` | `@workspace/db` | Drizzle ORM schema + DB client |
-| `packages/integrations-anthropic-ai` | `@workspace/integrations-anthropic-ai` | Anthropic AI client (used by AI Copilot) |
-| `scripts` | `@workspace/scripts` | Utility scripts |
+> `.kiro/specs/` contains only Markdown design docs and is safe to commit. If you
+> later add Kiro **settings** (e.g. `.kiro/settings/mcp.json`, which can hold API
+> keys), add `.kiro/settings/` to `.gitignore`.
 
 ---
 
-*Generated for NEXUS — AI Junction Optimizer. Last updated: May 2026.*
+## Security Notes
+
+- The included authentication is a **demo**: a hardcoded `admin` / `admin123`
+  credential with client-side gating only, and the mutating endpoints
+  (`/api/signals/*`, `/api/source/mode`) are **not** server-authenticated. Add
+  real authn/authz before any non-demo / public deployment.
+- Real secrets are environment variables, never committed.
+- Both cloud platforms serve over HTTPS/WSS by default.
+
+---
+
+## Scripts Reference
+
+| Command | What it does |
+|---------|--------------|
+| `pnpm dev` | Run API + dashboard together (dev) |
+| `pnpm run typecheck` | Typecheck the whole workspace |
+| `pnpm run build` | Typecheck + build all packages |
+| `pnpm --filter @workspace/db run push` | Push the Drizzle schema to the DB |
+| `pnpm --filter @workspace/api-spec run codegen` | Regenerate API client + Zod schemas from `openapi.yaml` |
+| `pnpm --filter @workspace/api run test` | API tests (Vitest + fast-check) |
+| `pnpm --filter @workspace/web run test` | Web tests (Vitest) |
+| `docker compose up --build -d` | Run the full self-hosted stack |
+
+---
+
+*NEXUS — AI Junction Optimizer.*

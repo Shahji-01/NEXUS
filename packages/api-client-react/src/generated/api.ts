@@ -19,6 +19,8 @@ import type {
 import type {
   AiModeInput,
   AiModeResult,
+  DataSourceModeResult,
+  DataSourceStatus,
   EmergencyEventList,
   GetEmergencyEventsParams,
   GetSignalLogParams,
@@ -28,6 +30,7 @@ import type {
   LoginInput,
   LoginResult,
   PredictionResponse,
+  SetDataSourceModeInput,
   SignalLogResponse,
   SignalOverrideInput,
   SignalOverrideResult,
@@ -965,3 +968,417 @@ export const useLogin = <
 > => {
   return useMutation(getLoginMutationOptions(options));
 };
+
+/**
+ * @summary Get the current data-source mode and detection status
+ */
+export const getGetDataSourceModeUrl = () => {
+  return `/api/source/mode`;
+};
+
+export const getDataSourceMode = async (
+  options?: RequestInit,
+): Promise<DataSourceModeResult> => {
+  return customFetch<DataSourceModeResult>(getGetDataSourceModeUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDataSourceModeQueryKey = () => {
+  return [`/api/source/mode`] as const;
+};
+
+export const getGetDataSourceModeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDataSourceMode>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDataSourceMode>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetDataSourceModeQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDataSourceMode>>
+  > = ({ signal }) => getDataSourceMode({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDataSourceMode>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDataSourceModeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDataSourceMode>>
+>;
+export type GetDataSourceModeQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current data-source mode and detection status
+ */
+
+export function useGetDataSourceMode<
+  TData = Awaited<ReturnType<typeof getDataSourceMode>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDataSourceMode>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDataSourceModeQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Set the active data-source mode (simulation or video)
+ */
+export const getSetDataSourceModeUrl = () => {
+  return `/api/source/mode`;
+};
+
+export const setDataSourceMode = async (
+  setDataSourceModeInput: SetDataSourceModeInput,
+  options?: RequestInit,
+): Promise<DataSourceModeResult> => {
+  return customFetch<DataSourceModeResult>(getSetDataSourceModeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(setDataSourceModeInput),
+  });
+};
+
+export const getSetDataSourceModeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setDataSourceMode>>,
+    TError,
+    { data: BodyType<SetDataSourceModeInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setDataSourceMode>>,
+  TError,
+  { data: BodyType<SetDataSourceModeInput> },
+  TContext
+> => {
+  const mutationKey = ["setDataSourceMode"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setDataSourceMode>>,
+    { data: BodyType<SetDataSourceModeInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return setDataSourceMode(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetDataSourceModeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setDataSourceMode>>
+>;
+export type SetDataSourceModeMutationBody = BodyType<SetDataSourceModeInput>;
+export type SetDataSourceModeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Set the active data-source mode (simulation or video)
+ */
+export const useSetDataSourceMode = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setDataSourceMode>>,
+    TError,
+    { data: BodyType<SetDataSourceModeInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setDataSourceMode>>,
+  TError,
+  { data: BodyType<SetDataSourceModeInput> },
+  TContext
+> => {
+  return useMutation(getSetDataSourceModeMutationOptions(options));
+};
+
+/**
+ * @summary Get the current data-source detection status
+ */
+export const getGetDetectionStatusUrl = () => {
+  return `/api/detection/status`;
+};
+
+export const getDetectionStatus = async (
+  options?: RequestInit,
+): Promise<DataSourceStatus> => {
+  return customFetch<DataSourceStatus>(getGetDetectionStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDetectionStatusQueryKey = () => {
+  return [`/api/detection/status`] as const;
+};
+
+export const getGetDetectionStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDetectionStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDetectionStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetDetectionStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDetectionStatus>>
+  > = ({ signal }) => getDetectionStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDetectionStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDetectionStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDetectionStatus>>
+>;
+export type GetDetectionStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current data-source detection status
+ */
+
+export function useGetDetectionStatus<
+  TData = Awaited<ReturnType<typeof getDetectionStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDetectionStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDetectionStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the latest annotated overlay frame for a lane (proxied)
+ */
+export const getGetDetectionLaneFrameUrl = (laneId: number) => {
+  return `/api/detection/lanes/${laneId}/frame`;
+};
+
+export const getDetectionLaneFrame = async (
+  laneId: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetDetectionLaneFrameUrl(laneId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDetectionLaneFrameQueryKey = (laneId: number) => {
+  return [`/api/detection/lanes/${laneId}/frame`] as const;
+};
+
+export const getGetDetectionLaneFrameQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDetectionLaneFrame>>,
+  TError = ErrorType<unknown>,
+>(
+  laneId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDetectionLaneFrame>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetDetectionLaneFrameQueryKey(laneId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDetectionLaneFrame>>
+  > = ({ signal }) =>
+    getDetectionLaneFrame(laneId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!laneId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDetectionLaneFrame>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDetectionLaneFrameQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDetectionLaneFrame>>
+>;
+export type GetDetectionLaneFrameQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the latest annotated overlay frame for a lane (proxied)
+ */
+
+export function useGetDetectionLaneFrame<
+  TData = Awaited<ReturnType<typeof getDetectionLaneFrame>>,
+  TError = ErrorType<unknown>,
+>(
+  laneId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDetectionLaneFrame>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDetectionLaneFrameQueryOptions(laneId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the MJPEG overlay stream for a lane (proxied)
+ */
+export const getGetDetectionLaneStreamUrl = (laneId: number) => {
+  return `/api/detection/lanes/${laneId}/stream`;
+};
+
+export const getDetectionLaneStream = async (
+  laneId: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetDetectionLaneStreamUrl(laneId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDetectionLaneStreamQueryKey = (laneId: number) => {
+  return [`/api/detection/lanes/${laneId}/stream`] as const;
+};
+
+export const getGetDetectionLaneStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDetectionLaneStream>>,
+  TError = ErrorType<unknown>,
+>(
+  laneId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDetectionLaneStream>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetDetectionLaneStreamQueryKey(laneId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDetectionLaneStream>>
+  > = ({ signal }) =>
+    getDetectionLaneStream(laneId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!laneId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDetectionLaneStream>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDetectionLaneStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDetectionLaneStream>>
+>;
+export type GetDetectionLaneStreamQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the MJPEG overlay stream for a lane (proxied)
+ */
+
+export function useGetDetectionLaneStream<
+  TData = Awaited<ReturnType<typeof getDetectionLaneStream>>,
+  TError = ErrorType<unknown>,
+>(
+  laneId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDetectionLaneStream>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDetectionLaneStreamQueryOptions(laneId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

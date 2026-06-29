@@ -16,6 +16,8 @@ import incidentsRouter from "./incidents";
 import transitRouter from "./transit";
 import networkRouter from "./network";
 import scheduleRouter from "./schedule";
+import sourceRouter from "./source";
+import detectionRouter from "./detection";
 
 const router: IRouter = Router();
 
@@ -36,5 +38,7 @@ router.use(incidentsRouter);
 router.use(transitRouter);
 router.use(networkRouter);
 router.use(scheduleRouter);
+router.use(sourceRouter);
+router.use(detectionRouter);
 
 export default router;

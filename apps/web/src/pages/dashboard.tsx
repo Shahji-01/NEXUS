@@ -1,6 +1,9 @@
 import { Shell } from "@/components/layout/shell";
 import { useTrafficStore } from "@/lib/store";
 import { LaneCard } from "@/components/traffic/lane-card";
+import { LaneVideoOverlay } from "@/components/traffic/lane-video-overlay";
+import { DataSourceToggle } from "@/components/source/data-source-toggle";
+import { DetectionStatusBadge } from "@/components/source/detection-status-badge";
 import { TrafficLight } from "@/components/traffic/traffic-light";
 import { JunctionMap } from "@/components/traffic/junction-map";
 import { IncidentTimeline } from "@/components/traffic/incident-timeline";
@@ -21,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 const LANE_NAMES = ["North Bound", "South Bound", "East Bound", "West Bound"];
 
 export default function Dashboard() {
-  const { lanes, signals, connected } = useTrafficStore();
+  const { lanes, signals, connected, dataSource } = useTrafficStore();
 
   const { data: summary, isLoading: isLoadingSummary } = useGetTrafficSummary({
     query: { queryKey: getGetTrafficSummaryQueryKey(), refetchInterval: 10000 }
@@ -31,12 +34,17 @@ export default function Dashboard() {
     query: { queryKey: getGetPredictionsQueryKey(), refetchInterval: 30000 }
   });
 
+  const isVideoMode = dataSource?.mode === "video";
+
   return (
     <Shell>
       <div className="space-y-5">
 
         {/* Demo walkthrough */}
         <DemoMode />
+
+        {/* Data source toggle (simulation vs CV video detection) */}
+        <DataSourceToggle />
 
         {/* KPI stat cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -72,12 +80,25 @@ export default function Dashboard() {
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
                 LIVE LANE STATUS
               </h3>
-              {signals?.ai_mode && (
-                <Badge variant="outline" className="text-primary border-primary/30 gap-1 text-[10px]">
-                  <Cpu className="w-3 h-3" /> AI OPTIMIZED
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                <DetectionStatusBadge />
+                {signals?.ai_mode && (
+                  <Badge variant="outline" className="text-primary border-primary/30 gap-1 text-[10px]">
+                    <Cpu className="w-3 h-3" /> AI OPTIMIZED
+                  </Badge>
+                )}
+              </div>
             </div>
+
+            {/* Video detection overlays — only in video mode (2×2 grid). */}
+            {isVideoMode && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[0, 1, 2, 3].map((id) => (
+                  <LaneVideoOverlay key={id} laneId={id} />
+                ))}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[0, 1, 2, 3].map((id) => (
                 <motion.div key={id} layout>

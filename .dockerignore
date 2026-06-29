@@ -1,0 +1,23 @@
+# Keep the Docker build context lean (applies to the repo-root build context
+# used by the Node app + migrate images).
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/.turbo
+.git
+.gitignore
+.kiro
+**/__pycache__
+**/.pytest_cache
+**/*.log
+
+# The detector's large demo clips + model weights are not needed by the Node
+# build context (the detector has its own build context).
+apps/detector/clips
+apps/detector/*.pt
+apps/detector/.venv
+
+# Local env files — secrets are injected at deploy time, never baked in.
+.env
+.env.*
+!.env.example

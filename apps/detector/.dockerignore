@@ -1,0 +1,9 @@
+# Detector build context (apps/detector). Keep it lean: the large demo clips
+# are mounted as a volume at runtime, not copied into the image.
+clips/*.mp4
+__pycache__
+**/__pycache__
+.pytest_cache
+.venv
+tests
+*.log

@@ -1,0 +1,6 @@
+# Bundled looping demo clips live here, one per lane:
+#   lane_0.mp4  (North)
+#   lane_1.mp4  (South)
+#   lane_2.mp4  (East)
+#   lane_3.mp4  (West)
+# The actual .mp4 files are not committed yet; this file keeps the folder in git.

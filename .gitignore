@@ -44,7 +44,26 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
-# environment variables
+# environment variables (NEVER commit real secrets)
 .env
 .env.*
 .env.local
+# ...but DO commit the example template (no secrets)
+!.env.example
+
+# Python (detector service)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Model weights (fetched at build time) and demo video clips (large)
+*.pt
+apps/detector/clips/*.mp4
+
+# Stray/duplicate codegen output (canonical output lives in packages/*)
+/lib/
+
+# Kiro (specs, settings, and any local tooling state)
+.kiro/
